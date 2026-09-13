@@ -74,14 +74,16 @@ public static class UModExportSettingsGuard {
     private const double BurstDuration       = 6.0;   // リロード直後にバースト監視する時間（秒）
     private const double DebounceSeconds     = 2.0;   // 編集が止まってから保存するまでの猶予
     private const double RestoreCooldown     = 1.0;   // 復元の連発防止（バースト中も最低限）
+    private const double MissingRetryInterval = 30.0; // ExportSettings.asset が見つからないときに再検索するまでの間隔（秒）
 
     private static double nextCheck;
     private static double burstUntil;
     private static double restoreCooldownUntil;
     private static double pendingSince;           // 0 なら保留中の変更なし
+    private static double missingRetryAt;         // この時刻までは ExportSettings.asset の再検索をしない
     private static string lastSeenContent;        // 直近チェック時のディスク内容（編集検出用）
     private static string cachedAssetPath;
-    private static string lastBackedUpContent;
+    private static string lastBackedUpContent;    // 直近にバックアップした内容。null ならまだ latest と比較していない
     private static bool   warnedMissingField;
     private static bool   warnedEmptyWhileAutoRestoreOff;   // Auto Restore OFF 中、空状態の警告を1回だけ出すためのフラグ
 
@@ -256,6 +258,13 @@ public static class UModExportSettingsGuard {
 
     private static void Backup(string assetPath, string content, int profileCount, string reason) {
         if (string.IsNullOrEmpty(content)) return;
+
+        // ドメインリロードで静的フィールドは消えるため、メモリ上の記録が無いときは
+        // ディスク上の latest と比較します。こうしないとリロードのたびに同じ内容が
+        // 履歴に積まれ、本当に意味のある古い履歴が押し出されてしまいます。
+        if (lastBackedUpContent == null) {
+            lastBackedUpContent = ReadAllTextSafe(LatestBackupPath);
+        }
         if (content == lastBackedUpContent) return;   // 同じ内容なら書かない
 
         Directory.CreateDirectory(BackupDir);
@@ -327,21 +336,33 @@ public static class UModExportSettingsGuard {
         get { return Path.Combine(BackupDir, LatestName); }
     }
 
-    /// <summary>Assets 以下から ExportSettings.asset を探し、プロジェクト相対パスで返します。</summary>
-    private static string FindAssetPath() {
+    /// <summary>
+    /// Assets 以下から ExportSettings.asset を探し、プロジェクト相対パスで返します。
+    /// force が true なら「見つからなかった」キャッシュを無視して即座に再検索します。
+    /// </summary>
+    private static string FindAssetPath(bool force = false) {
         if (cachedAssetPath != null && File.Exists(ToAbsolute(cachedAssetPath))) {
             return cachedAssetPath;
         }
         cachedAssetPath = null;
+
+        // 見つからなかった結果もしばらく覚えておきます。そうしないとファイルが無い
+        // プロジェクトで毎回 Assets 全体を再帰検索してしまい、Editor が重くなります。
+        // メニューからの手動操作は force で即座に再検索します。
+        if (!force && EditorApplication.timeSinceStartup < missingRetryAt) return null;
 
         string[] found;
         try {
             found = Directory.GetFiles(Application.dataPath, "ExportSettings.asset",
                                        SearchOption.AllDirectories);
         } catch (Exception) {
+            missingRetryAt = EditorApplication.timeSinceStartup + MissingRetryInterval;
             return null;
         }
-        if (found.Length == 0) return null;
+        if (found.Length == 0) {
+            missingRetryAt = EditorApplication.timeSinceStartup + MissingRetryInterval;
+            return null;
+        }
 
         // UMod フォルダ配下のものを優先します
         var best = found.FirstOrDefault(f => f.Replace('\\', '/').Contains("/UMod/")) ?? found[0];
@@ -370,7 +391,7 @@ public static class UModExportSettingsGuard {
 
     [MenuItem("Tools/UMod Settings Guard/Backup Now")]
     private static void MenuBackupNow() {
-        var path = FindAssetPath();
+        var path = FindAssetPath(true);
         if (path == null) {
             Debug.LogWarning("[UMod Guard] ExportSettings.asset が見つかりません。");
             return;
@@ -401,7 +422,7 @@ public static class UModExportSettingsGuard {
 
     [MenuItem("Tools/UMod Settings Guard/Restore Latest Backup")]
     private static void MenuRestore() {
-        var path = FindAssetPath();
+        var path = FindAssetPath(true);
         if (path == null) {
             Debug.LogWarning("[UMod Guard] ExportSettings.asset が見つかりません。");
             return;

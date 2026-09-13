@@ -1,0 +1,11 @@
+# UMod Guard が作成するバックアップフォルダ（ローカルの絶対パスを含むため追跡しない）
+# Backup folder created by UMod Guard (contains local absolute paths; do not track)
+UModExportSettingsBackup/
+
+# Unity のメタファイルはこのリポジトリでは扱わない
+# Unity meta files are not tracked in this repository
+*.meta
+
+# OS / editor noise
+Thumbs.db
+.DS_Store

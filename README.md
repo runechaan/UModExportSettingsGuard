@@ -60,7 +60,10 @@ UModExportSettingsBackup/
 
 ### 動作確認環境と注意
 
-- Unity 2021.3.45f2 / Warudo SDK 0.14.3.5 で動作を確認しています。
+- 次の環境で動作を確認しています。
+  - Unity 2021.3.45f2
+  - Warudo SDK（Warudo Mod Tool）0.14.5.1
+  - uMod 2.9.9a（Warudo SDK に同梱）
 - uMod 内部のフィールド名（`exportProfiles`）に依存しているため、将来の uMod 更新で効かなくなる可能性があります。その場合は「exportProfiles フィールドが見つかりません」という警告が1回だけ出て、ツールは何もしなくなります。設定を壊すことはありません。
 - ログはすべて `[UMod Guard]` という接頭辞付きで Unity のコンソールに出ます。
 - 自動復元の ON / OFF 設定は Unity の EditorPrefs にプロジェクトごとに保存されます。
@@ -125,7 +128,10 @@ UModExportSettingsBackup/
 
 ### Tested environment and caveats
 
-- Tested with Unity 2021.3.45f2 and Warudo SDK 0.14.3.5.
+- Tested with:
+  - Unity 2021.3.45f2
+  - Warudo SDK (Warudo Mod Tool) 0.14.5.1
+  - uMod 2.9.9a (bundled with the Warudo SDK)
 - The tool depends on uMod's internal field name (`exportProfiles`), so a future uMod update may stop it from working. In that case it logs a single warning ("exportProfiles field not found") and then does nothing. It will never damage your settings.
 - All log messages are prefixed with `[UMod Guard]` in the Unity console. The messages themselves are in Japanese.
 - The Auto Restore setting is stored per project in Unity's EditorPrefs.
